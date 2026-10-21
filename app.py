@@ -1,4 +1,3 @@
-#Main application file for the QR Attendance System
 import secrets
 
 from flask import (
@@ -12,7 +11,10 @@ from flask import (
 )
 
 from database import get_db_connection
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import (
+    generate_password_hash,
+    check_password_hash
+)
 
 
 app = Flask(__name__)
@@ -120,7 +122,7 @@ def register():
             flash("Enter a valid 6-digit PIN code.")
             return redirect(url_for("register"))
 
-        # Department and course validation
+        # Validate department and course
         department_courses = {
             "Applied Science": [
                 "B.Tech Artificial Intelligence (AI)",
@@ -131,16 +133,22 @@ def register():
                 "Diploma in Computer Science (CS)",
                 "Diploma in Electronics and Communication Engineering (ECE)"
             ],
+
             "Allied Science": ["RMT", "OTT", "BPT"],
+
             "Pharmacy": ["B.Pharma", "D.Pharma", "Pharm.D"],
+
             "Computer Science": [
                 "B.Tech Artificial Intelligence (AI)",
                 "B.Tech Computer Science Engineering (CSE)",
                 "B.Tech Computer Science and Design (CSD)",
                 "Diploma in Computer Science (CS)"
             ],
+
             "Law": ["LLB"],
+
             "Business Administration": ["BBA", "MBA"],
+
             "Hotel Management": [
                 "BHM (Bachelor of Hotel Management)",
                 "B.Sc. Hospitality and Hotel Administration",
@@ -148,11 +156,13 @@ def register():
                 "Diploma in Food Production",
                 "Diploma in Front Office Operations"
             ],
+
             "ME/CIVIL/ECE": [
                 "B.Tech Mechanical Engineering",
                 "B.Tech Civil Engineering",
                 "Diploma in Electronics and Communication Engineering (ECE)"
             ],
+
             "Department of Computer Application": ["BCA", "MCA"]
         }
 
@@ -164,7 +174,7 @@ def register():
             flash("Please select a valid residence type.")
             return redirect(url_for("register"))
 
-        # Convert optional numeric fields
+        # Convert optional numeric values
         try:
             year = int(year) if year else None
             semester = int(semester) if semester else None
@@ -283,32 +293,32 @@ def login():
 
         try:
             user = conn.execute(
-                "SELECT * FROM users WHERE email = ?",
+                """
+                SELECT *
+                FROM users
+                WHERE email = ?
+                """,
                 (email,)
             ).fetchone()
 
         finally:
             conn.close()
 
-        if not user or not check_password_hash(
-            user["password"], password
-        ):
-            flash("Invalid email or password.")
-            return redirect(url_for("login"))
+        if user and check_password_hash(user["password"], password):
 
-        if user["role"] != "student":
-            flash(
-                "This account is registered as a teacher. "
-                "Please use Faculty Login."
-            )
-            return redirect(url_for("login"))
+            if user["role"] != "student":
+                flash("Please use the faculty login page.")
+                return redirect(url_for("faculty_login"))
 
-        session.clear()
-        session["user_id"] = user["id"]
-        session["name"] = user["name"]
-        session["role"] = user["role"]
+            session.clear()
+            session["user_id"] = user["id"]
+            session["name"] = user["name"]
+            session["role"] = user["role"]
 
-        return redirect(url_for("student_dashboard"))
+            return redirect(url_for("student_dashboard"))
+
+        flash("Invalid email or password.")
+        return redirect(url_for("login"))
 
     return render_template("login.html")
 
@@ -331,32 +341,32 @@ def faculty_login():
 
         try:
             user = conn.execute(
-                "SELECT * FROM users WHERE email = ?",
+                """
+                SELECT *
+                FROM users
+                WHERE email = ?
+                """,
                 (email,)
             ).fetchone()
 
         finally:
             conn.close()
 
-        if not user or not check_password_hash(
-            user["password"], password
-        ):
-            flash("Invalid email or password.")
-            return redirect(url_for("faculty_login"))
+        if user and check_password_hash(user["password"], password):
 
-        if user["role"] != "teacher":
-            flash(
-                "This account is registered as a student. "
-                "Please use Student Login."
-            )
-            return redirect(url_for("faculty_login"))
+            if user["role"] != "teacher":
+                flash("Please use the student login page.")
+                return redirect(url_for("login"))
 
-        session.clear()
-        session["user_id"] = user["id"]
-        session["name"] = user["name"]
-        session["role"] = user["role"]
+            session.clear()
+            session["user_id"] = user["id"]
+            session["name"] = user["name"]
+            session["role"] = user["role"]
 
-        return redirect(url_for("teacher_dashboard"))
+            return redirect(url_for("teacher_dashboard"))
+
+        flash("Invalid email or password.")
+        return redirect(url_for("faculty_login"))
 
     return render_template("faculty_login.html")
 
@@ -377,6 +387,7 @@ def student_dashboard():
     conn = get_db_connection()
 
     try:
+        # Get student profile
         student = conn.execute(
             """
             SELECT
@@ -403,6 +414,7 @@ def student_dashboard():
             flash("Student profile not found.")
             return redirect(url_for("login"))
 
+        # Calculate attendance statistics
         attendance_stats = conn.execute(
             """
             SELECT
@@ -419,6 +431,7 @@ def student_dashboard():
             (student["student_id"],)
         ).fetchone()
 
+        # Get attendance history
         attendance_history = conn.execute(
             """
             SELECT attendance_date, status
@@ -467,6 +480,7 @@ def teacher_dashboard():
     conn = get_db_connection()
 
     try:
+        # Get teacher details
         teacher = conn.execute(
             """
             SELECT name, email
@@ -481,6 +495,7 @@ def teacher_dashboard():
             flash("Teacher account not found.")
             return redirect(url_for("faculty_login"))
 
+        # Count registered students
         total_students = conn.execute(
             """
             SELECT COUNT(*)
@@ -490,6 +505,7 @@ def teacher_dashboard():
             """
         ).fetchone()[0]
 
+        # Count present attendance records
         total_attendance = conn.execute(
             """
             SELECT COUNT(*)
@@ -498,6 +514,7 @@ def teacher_dashboard():
             """
         ).fetchone()[0]
 
+        # Fetch registered students
         students = conn.execute(
             """
             SELECT
